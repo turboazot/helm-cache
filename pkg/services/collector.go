@@ -28,15 +28,6 @@ import (
 	"k8s.io/utils/strings/slices"
 )
 
-func isDirectory(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false, err
-	}
-
-	return fileInfo.IsDir(), err
-}
-
 func writeStringToFile(path string, content string) error {
 	directory := filepath.Dir(path)
 
@@ -296,11 +287,8 @@ func (c *Collector) PackageHelmChart(chartName string, chartVersion string, char
 			if err != nil {
 				return err
 			}
-			pathIsDirectory, err := isDirectory(path)
-			if err != nil {
-				return err
-			}
-			if !pathIsDirectory {
+
+			if !info.IsDir() {
 				packageFiles = append(packageFiles, path)
 			}
 
