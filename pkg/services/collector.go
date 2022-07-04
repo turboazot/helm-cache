@@ -157,6 +157,9 @@ func execCommand(command string) (string, error) {
 
 func getChartNameAndRevisionFromSecretName(secretName string) (string, int, error) {
 	secretNameSplitted := strings.Split(secretName, ".")
+	if len(secretNameSplitted) < 5 {
+		return "", 0, errors.New("This secret is not helm release secret")
+	}
 	secretChartName := secretNameSplitted[4]
 	secretRevisionInt, err := strconv.Atoi(strings.Replace(secretNameSplitted[5], "v", "", -1))
 	return secretChartName, secretRevisionInt, err
@@ -262,7 +265,9 @@ func (c *Collector) RefreshChartLastRevisionRegistry(secrets *v1.SecretList) {
 			continue
 		}
 
-		c.ChartLastRevisionRegistry[secretChartName] = secretRevisionInt
+		if _, chartInstanceExists := c.ChartLastRevisionRegistry[secretChartName]; !chartInstanceExists || c.ChartLastRevisionRegistry[secretChartName] < secretRevisionInt {
+			c.ChartLastRevisionRegistry[secretChartName] = secretRevisionInt
+		}
 	}
 }
 
