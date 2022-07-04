@@ -185,6 +185,7 @@ type Collector struct {
 }
 
 func NewCollector(chartmuseumUrl string, chartmuseumUsername string, chartmuseumPassword string) *Collector {
+	// In-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())

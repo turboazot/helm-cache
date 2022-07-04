@@ -31,15 +31,20 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: CHARTMUSEUM_URL
-              value: {{ required ".Values.chartmuseum.url is required" .Values.chartmuseum.url | quote }}
-            - name: CHARTMUSEUM_USERNAME
-              value: {{ required ".Values.chartmuseum.username is required" .Values.chartmuseum.username | quote }}
-            - name: CHARTMUSEUM_PASSWORD
-              value: {{ required ".Values.chartmuseum.password is required" .Values.chartmuseum.password | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /opt/helm-cache
+          command:
+            - /bin/sh
+            - -c
+            - |
+              helm-cache --config /opt/helm-cache/config.yaml
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "helm-cache.fullname" . }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
