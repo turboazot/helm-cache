@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/strings/slices"
 )
 
 func writeStringToFile(path string, content string) error {
@@ -170,7 +169,7 @@ type Collector struct {
 	ChartmuseumPassword       string
 	KubernetesClientset       *kubernetes.Clientset
 	HttpClient                *http.Client
-	ChartVersionsRegistry     map[string][]string
+	ChartVersionsRegistry     map[string]map[string]bool
 	ChartLastRevisionRegistry map[string]int
 }
 
@@ -191,7 +190,7 @@ func NewCollector(chartmuseumUrl string, chartmuseumUsername string, chartmuseum
 		ChartmuseumUrl:            chartmuseumUrl,
 		ChartmuseumUsername:       chartmuseumUsername,
 		ChartmuseumPassword:       chartmuseumPassword,
-		ChartVersionsRegistry:     make(map[string][]string),
+		ChartVersionsRegistry:     make(map[string]map[string]bool),
 		ChartLastRevisionRegistry: make(map[string]int),
 		HttpClient:                &http.Client{},
 		KubernetesClientset:       clientset,
@@ -242,9 +241,10 @@ func (c *Collector) RefreshChartVersionRegistry(secrets *v1.SecretList) error {
 			}
 
 			chartInstanceVersion := chartInstanceMap["version"].Data().(string)
-			if !slices.Contains(c.ChartVersionsRegistry[name], chartInstanceVersion) {
-				c.ChartVersionsRegistry[name] = append(c.ChartVersionsRegistry[name], chartInstanceVersion)
+			if _, chartInstanceExists := c.ChartVersionsRegistry[name]; !chartInstanceExists {
+				c.ChartVersionsRegistry[name] = make(map[string]bool)
 			}
+			c.ChartVersionsRegistry[name][chartInstanceVersion] = true
 		}
 	}
 
@@ -386,7 +386,7 @@ func (c *Collector) UploadHelmPackage(chartName string, chartVersion string) err
 	if resp.StatusCode != 201 {
 		return errors.New(fmt.Sprintf("Receiving list of charts failed. Status code - %d, Body - %s", resp.StatusCode, string(responseBody)))
 	}
-	c.ChartVersionsRegistry[chartName] = append(c.ChartVersionsRegistry[chartName], chartVersion)
+	c.ChartVersionsRegistry[chartName][chartVersion] = true
 	zap.L().Sugar().Infof("Chart %s-%s has been saved successfully", chartName, chartVersion)
 	return nil
 }
@@ -431,7 +431,7 @@ func (c *Collector) CheckAllSecrets() error {
 		chartPath := fmt.Sprintf("%s/%s-%s", c.ChartsRootDir, chartName, chartVersion)
 
 		// Check if chart is already in registry
-		if slices.Contains(c.ChartVersionsRegistry[chartName], chartVersion) {
+		if c.ChartVersionsRegistry[chartName][chartVersion] {
 			zap.L().Sugar().Infof("Chart %s-%s already exists. Skipping", chartName, chartVersion)
 			os.RemoveAll(chartPath)
 			os.RemoveAll(fmt.Sprintf("%s-%s.tgz", chartName, chartVersion))
