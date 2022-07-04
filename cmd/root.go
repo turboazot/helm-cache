@@ -9,47 +9,52 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/turboazot/helm-cache/pkg/services"
+	"go.uber.org/zap"
 )
 
-var (
-	cfgFile string
+var cfgFile string
+var rootCmd = &cobra.Command{
+	Use:   "helm-cache",
+	Short: "Helm chart cache daemon",
+	Long:  "A cache daemon that caching Helm v3 charts in Kubernetes cluster",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return initConfig(cmd)
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		chartmuseumUrl, err := cmd.Flags().GetString("chartmuseumUrl")
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to get chartmuseum url: %v", err)
+		}
+		chartmuseumUsername, err := cmd.Flags().GetString("chartmuseumUsername")
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to get chartmuseum username: %v", err)
+		}
+		chartmuseumPassword, err := cmd.Flags().GetString("chartmuseumPassword")
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to get chartmuseum password: %v", err)
+		}
 
-	rootCmd = &cobra.Command{
-		Use:   "helm-cache",
-		Short: "Helm chart cache daemon",
-		Long:  "A cache daemon that caching Helm v3 charts in Kubernetes cluster",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return initConfig(cmd)
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			chartmuseumUrl, err := cmd.Flags().GetString("chartmuseumUrl")
-			if err != nil {
-				panic(err.Error())
-			}
-			chartmuseumUsername, err := cmd.Flags().GetString("chartmuseumUsername")
-			if err != nil {
-				panic(err.Error())
-			}
-			chartmuseumPassword, err := cmd.Flags().GetString("chartmuseumPassword")
-			if err != nil {
-				panic(err.Error())
-			}
+		scanningInterval, err := cmd.Flags().GetInt("scanningInterval")
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to get scanning interval: %v", err)
+		}
 
-			scanningInterval, err := cmd.Flags().GetInt("scanningInterval")
-			if err != nil {
-				panic(err.Error())
-			}
+		c, err := services.NewCollector(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to initialize collector: %v", err)
+		}
 
-			c := services.NewCollector(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
-			for {
-				fmt.Println("Checking all helm secrets...")
-				c.CheckAllSecrets()
-				fmt.Println("Checking finished!")
-				time.Sleep(time.Millisecond * time.Duration(scanningInterval*1000))
+		for {
+			zap.L().Sugar().Info("Checking all helm secrets...")
+			err = c.CheckAllSecrets()
+			if err != nil {
+				zap.L().Sugar().Fatalf("Fail to check helm secrets: %v", err)
 			}
-		},
-	}
-)
+			zap.L().Sugar().Info("Checking finished!")
+			time.Sleep(time.Millisecond * time.Duration(scanningInterval*1000))
+		}
+	},
+}
 
 // Execute executes the root command.
 func Execute() error {
@@ -89,7 +94,7 @@ func initConfig(cmd *cobra.Command) error {
 	v.AutomaticEnv()
 
 	if err := v.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", v.ConfigFileUsed())
+		zap.L().Sugar().Infof("Using config file: %s", v.ConfigFileUsed())
 	}
 
 	bindFlags(cmd, v)

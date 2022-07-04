@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/Jeffail/gabs"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -153,7 +153,6 @@ func addToArchive(tw *tar.Writer, filename string, replaceOldPath string, replac
 func execCommand(command string) (string, error) {
 	output, err := exec.Command("sh", "-c", command).CombinedOutput()
 	outputString := string(output)
-	fmt.Printf("CMD: %s;\nOutput:\n%s\n", command, outputString)
 	return outputString, err
 }
 
@@ -175,16 +174,16 @@ type Collector struct {
 	ChartLastRevisionRegistry map[string]int
 }
 
-func NewCollector(chartmuseumUrl string, chartmuseumUsername string, chartmuseumPassword string) *Collector {
+func NewCollector(chartmuseumUrl string, chartmuseumUsername string, chartmuseumPassword string) (*Collector, error) {
 	// In-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	return &Collector{
@@ -196,46 +195,49 @@ func NewCollector(chartmuseumUrl string, chartmuseumUsername string, chartmuseum
 		ChartLastRevisionRegistry: make(map[string]int),
 		HttpClient:                &http.Client{},
 		KubernetesClientset:       clientset,
-	}
+	}, nil
 }
 
-func (c *Collector) RefreshChartVersionRegistry(secrets *v1.SecretList) {
+func (c *Collector) RefreshChartVersionRegistry(secrets *v1.SecretList) error {
 	// Get all helm charts
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/charts", c.ChartmuseumUrl), nil)
 	req.SetBasicAuth(c.ChartmuseumUsername, c.ChartmuseumPassword)
 	resp, err := c.HttpClient.Do(req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	defer resp.Body.Close()
 	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	if resp.StatusCode != 200 {
-		log.Fatalf("Receiving list of charts failed. Status code - %d, Body - %s", resp.StatusCode, string(responseBody))
-		os.Exit(1)
+		return errors.New(fmt.Sprintf("Receiving list of charts failed. Status code - %d, Body - %s", resp.StatusCode, string(responseBody)))
 	}
 
 	chartListContainer, err := gabs.ParseJSON(responseBody)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	chartsMap, err := chartListContainer.ChildrenMap()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for name, _ := range chartsMap {
 		chartsInstances, err := chartListContainer.Path(name).Children()
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't parse JSON from chartmuseum response: %v", err)
 			continue
 		}
 
 		for _, chartInstance := range chartsInstances {
 			chartInstanceMap, err := chartInstance.ChildrenMap()
 			if err != nil {
-				log.Fatal(err)
+				zap.L().Sugar().Infof("Can't parse JSON from chartmuseum response: %v", err)
 				continue
 			}
 
@@ -245,6 +247,8 @@ func (c *Collector) RefreshChartVersionRegistry(secrets *v1.SecretList) {
 			}
 		}
 	}
+
+	return nil
 }
 
 func (c *Collector) RefreshChartLastRevisionRegistry(secrets *v1.SecretList) {
@@ -254,7 +258,7 @@ func (c *Collector) RefreshChartLastRevisionRegistry(secrets *v1.SecretList) {
 		}
 		secretChartName, secretRevisionInt, err := getChartNameAndRevisionFromSecretName(secret.Name)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't get chart name and revision from secret %s: %v", secret.Name, err)
 			continue
 		}
 
@@ -376,21 +380,27 @@ func (c *Collector) UploadHelmPackage(chartName string, chartVersion string) err
 	}
 	defer resp.Body.Close()
 	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode != 201 {
 		return errors.New(fmt.Sprintf("Receiving list of charts failed. Status code - %d, Body - %s", resp.StatusCode, string(responseBody)))
 	}
 	c.ChartVersionsRegistry[chartName] = append(c.ChartVersionsRegistry[chartName], chartVersion)
-	fmt.Printf("Chart %s-%s has been saved successfully\n", chartName, chartVersion)
+	zap.L().Sugar().Infof("Chart %s-%s has been saved successfully", chartName, chartVersion)
 	return nil
 }
 
-func (c *Collector) CheckAllSecrets() {
+func (c *Collector) CheckAllSecrets() error {
 	secrets, err := c.KubernetesClientset.CoreV1().Secrets("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
-	c.RefreshChartVersionRegistry(secrets)
+	err = c.RefreshChartVersionRegistry(secrets)
+	if err != nil {
+		return err
+	}
 
 	// Remove old versions
 	c.RefreshChartLastRevisionRegistry(secrets)
@@ -401,18 +411,18 @@ func (c *Collector) CheckAllSecrets() {
 		}
 		secretChartName, secretRevisionInt, err := getChartNameAndRevisionFromSecretName(secret.Name)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't get chart name and revision from secret %s: %v", secret.Name, err)
 			continue
 		}
 		if secretRevisionInt < c.ChartLastRevisionRegistry[secretChartName] {
 			continue
 		}
 
-		fmt.Printf("Checking secret %s...\n", secret.Name)
+		zap.L().Sugar().Infof("Checking secret %s...", secret.Name)
 
 		decodedReleaseContainer, err := c.DecodeReleaseString(string(secret.Data["release"]))
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't decode release from secret %s: %v", secret.Name, err)
 			continue
 		}
 
@@ -422,7 +432,7 @@ func (c *Collector) CheckAllSecrets() {
 
 		// Check if chart is already in registry
 		if slices.Contains(c.ChartVersionsRegistry[chartName], chartVersion) {
-			fmt.Printf("Chart %s-%s already exists. Skipping\n", chartName, chartVersion)
+			zap.L().Sugar().Infof("Chart %s-%s already exists. Skipping", chartName, chartVersion)
 			os.RemoveAll(chartPath)
 			os.RemoveAll(fmt.Sprintf("%s-%s.tgz", chartName, chartVersion))
 			continue
@@ -432,7 +442,7 @@ func (c *Collector) CheckAllSecrets() {
 		valuesContainer := decodedReleaseContainer.Path("chart.values")
 		err = writeMapContainerToFile(fmt.Sprintf("%s/values.yaml", chartPath), valuesContainer)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't create values.yaml file for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
@@ -440,62 +450,64 @@ func (c *Collector) CheckAllSecrets() {
 		chartYamlContainer := decodedReleaseContainer.Path("chart.metadata")
 		err = writeMapContainerToFile(fmt.Sprintf("%s/Chart.yaml", chartPath), chartYamlContainer)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't create Chart.yaml file for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
 		// Create templates
 		templates, err := decodedReleaseContainer.Path("chart.templates").Children()
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't decode templates for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 		err = createChartFiles(chartPath, templates)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't create templates for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
 		// Create files
 		files, err := decodedReleaseContainer.Path("chart.files").Children()
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't decode files for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 		err = createChartFiles(chartPath, files)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't create files for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
 		// Add repositories
 		err = c.AddHelmRepositories(decodedReleaseContainer)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't add helm repositories for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
 		// Fetch dependencies
 		_, err = execCommand(fmt.Sprintf("helm dep update %s", chartPath))
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't update dependencies for %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
 		// Create package
 		err = c.PackageHelmChart(chartName, chartVersion, chartPath)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't package %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 
 		// Upload helm package
 		err = c.UploadHelmPackage(chartName, chartVersion)
 		if err != nil {
-			log.Fatal(err)
+			zap.L().Sugar().Infof("Can't upload %s-%s chart: %v", chartName, chartVersion, err)
 			continue
 		}
 		os.RemoveAll(chartPath)
 		os.RemoveAll(fmt.Sprintf("%s-%s.tgz", chartName, chartVersion))
 	}
+
+	return nil
 }
