@@ -160,9 +160,9 @@ func addToArchive(tw *tar.Writer, filename string, replaceOldPath string, replac
 }
 
 func execCommand(command string) (string, error) {
-	output, err := exec.Command("bash", "-c", command).CombinedOutput()
+	output, err := exec.Command("sh", "-c", command).CombinedOutput()
 	outputString := string(output)
-	fmt.Printf("CMD: %s; Output:\n%s\n", command, outputString)
+	fmt.Printf("CMD: %s;\nOutput:\n%s\n", command, outputString)
 	return outputString, err
 }
 
