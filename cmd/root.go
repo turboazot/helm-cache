@@ -35,12 +35,17 @@ var (
 				panic(err.Error())
 			}
 
+			scanningInterval, err := cmd.Flags().GetInt("scanningInterval")
+			if err != nil {
+				panic(err.Error())
+			}
+
 			c := services.NewCollector(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
 			for {
 				fmt.Println("Checking all helm secrets...")
 				c.CheckAllSecrets()
 				fmt.Println("Checking finished!")
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Millisecond * time.Duration(scanningInterval*1000))
 			}
 		},
 	}
@@ -58,10 +63,12 @@ func init() {
 	rootCmd.PersistentFlags().StringP("chartmuseumUsername", "u", "", "Chartmuseum username")
 	rootCmd.MarkPersistentFlagRequired("chartmuseumUsername")
 	rootCmd.PersistentFlags().StringP("chartmuseumPassword", "p", "", "Chartmuseum password")
-	rootCmd.MarkPersistentFlagRequired("chartmuseumPassword")
+	rootCmd.MarkPersistentFlagRequired("scanningInterval")
+	rootCmd.PersistentFlags().IntP("scanningInterval", "s", 10, "Interval between scanning helm release secrets")
 	viper.BindPFlag("chartmuseumUrl", rootCmd.PersistentFlags().Lookup("chartmuseumUrl"))
 	viper.BindPFlag("chartmuseumUsername", rootCmd.PersistentFlags().Lookup("chartmuseumUsername"))
 	viper.BindPFlag("chartmuseumPassword", rootCmd.PersistentFlags().Lookup("chartmuseumPassword"))
+	viper.BindPFlag("scanningInterval", rootCmd.PersistentFlags().Lookup("scanningInterval"))
 }
 
 func initConfig(cmd *cobra.Command) error {

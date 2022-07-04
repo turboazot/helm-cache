@@ -9,3 +9,4 @@ data:
     chartmuseumUrl: {{ .Values.chartmuseum.url | quote }}
     chartmuseumUsername: {{ .Values.chartmuseum.username | quote }}
     chartmuseumPassword: {{ .Values.chartmuseum.password | quote }}
+    scanningInterval: {{ .Values.scanningInterval | quote }}
