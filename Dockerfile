@@ -3,7 +3,7 @@ WORKDIR /build
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o helm-cache .
 
-FROM alpine/helm:3.7.0
+FROM alpine:3.16.0
 COPY --from=builder /build/helm-cache /usr/local/bin/helm-cache
 
 ENTRYPOINT [ "helm-cache" ]

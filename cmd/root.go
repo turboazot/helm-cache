@@ -13,6 +13,7 @@ import (
 )
 
 var cfgFile string
+var homeDirectory string
 var rootCmd = &cobra.Command{
 	Use:   "helm-cache",
 	Short: "Helm chart cache daemon",
@@ -39,7 +40,17 @@ var rootCmd = &cobra.Command{
 			zap.L().Sugar().Fatalf("Fail to get scanning interval: %v", err)
 		}
 
-		c, err := services.NewCollector(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
+		helmClient, err := services.NewHelmClient(homeDirectory)
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to initialize helm client: %v", err)
+		}
+
+		chartmuseumClient, err := services.NewChartmuseumClient(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to initialize chartmuseum client: %v", err)
+		}
+
+		c, err := services.NewCollector(helmClient, chartmuseumClient)
 		if err != nil {
 			zap.L().Sugar().Fatalf("Fail to initialize collector: %v", err)
 		}
@@ -56,19 +67,16 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// Execute executes the root command.
 func Execute() error {
 	return rootCmd.Execute()
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.helm-cache.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is path to config.yaml under helm-cache home directory)")
+	rootCmd.PersistentFlags().StringVar(&homeDirectory, "homedir", "", "Home directory (default is $HOME/.helm-cache)")
 	rootCmd.PersistentFlags().StringP("chartmuseumUrl", "c", "", "Chartmuseum URL")
-	rootCmd.MarkPersistentFlagRequired("chartmuseumUrl")
 	rootCmd.PersistentFlags().StringP("chartmuseumUsername", "u", "", "Chartmuseum username")
-	rootCmd.MarkPersistentFlagRequired("chartmuseumUsername")
 	rootCmd.PersistentFlags().StringP("chartmuseumPassword", "p", "", "Chartmuseum password")
-	rootCmd.MarkPersistentFlagRequired("scanningInterval")
 	rootCmd.PersistentFlags().IntP("scanningInterval", "s", 10, "Interval between scanning helm release secrets")
 	viper.BindPFlag("chartmuseumUrl", rootCmd.PersistentFlags().Lookup("chartmuseumUrl"))
 	viper.BindPFlag("chartmuseumUsername", rootCmd.PersistentFlags().Lookup("chartmuseumUsername"))
@@ -77,18 +85,22 @@ func init() {
 }
 
 func initConfig(cmd *cobra.Command) error {
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
 	v := viper.New()
+
+	if homeDirectory == "" {
+		homeDirectory = fmt.Sprintf("%s/.helm-cache", userHomeDir)
+	}
+
 	if cfgFile != "" {
-		// Use config file from the flag.
 		v.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		v.AddConfigPath(home)
+		v.AddConfigPath(homeDirectory)
 		v.SetConfigType("yaml")
-		v.SetConfigName(".helm-cache")
+		v.SetConfigName("config")
 	}
 
 	v.AutomaticEnv()
