@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,7 +11,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/Jeffail/gabs"
+	"github.com/turboazot/helm-cache/pkg/entities"
+
 	"go.uber.org/zap"
 )
 
@@ -36,29 +38,20 @@ func NewChartmuseumClient(chartmuseumUrl string, chartmuseumUsername string, cha
 	}
 
 	chartListBytes, err := c.GetAllCharts()
-	chartListContainer, err := gabs.ParseJSON(chartListBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	chartsMapContainer, err := chartListContainer.ChildrenMap()
+	var chartsMap map[string][]entities.RestChart
+
+	err = json.Unmarshal(chartListBytes, &chartsMap)
 	if err != nil {
 		return nil, err
 	}
 
-	for chartName, _ := range chartsMapContainer {
-		chartsInstancesContainer, err := chartListContainer.Path(chartName).Children()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, chartInstanceContainer := range chartsInstancesContainer {
-			chartInstanceContainerMap, err := chartInstanceContainer.ChildrenMap()
-			if err != nil {
-				return nil, err
-			}
-
-			chartInstanceVersion := chartInstanceContainerMap["version"].Data().(string)
+	for chartName, chartsArray := range chartsMap {
+		for _, chart := range chartsArray {
+			chartInstanceVersion := chart.Version
 			if _, chartInstanceExists := c.ChartVersionCache[chartName]; !chartInstanceExists {
 				c.ChartVersionCache[chartName] = make(map[string]bool)
 			}
