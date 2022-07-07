@@ -17,7 +17,7 @@ chartmuseum:
   username: ""
   password: ""
 
-scanningInterval: 10
+scanningInterval: 10s
 
 rbac:
   create: true

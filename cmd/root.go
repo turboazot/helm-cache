@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 			zap.L().Sugar().Fatalf("Fail to get chartmuseum password: %v", err)
 		}
 
-		scanningInterval, err := cmd.Flags().GetInt("scanningInterval")
+		scanningInterval, err := cmd.Flags().GetDuration("scanningInterval")
 		if err != nil {
 			zap.L().Sugar().Fatalf("Fail to get scanning interval: %v", err)
 		}
@@ -62,7 +62,7 @@ var rootCmd = &cobra.Command{
 				zap.L().Sugar().Fatalf("Fail to check helm secrets: %v", err)
 			}
 			zap.L().Sugar().Info("Checking finished!")
-			time.Sleep(time.Millisecond * time.Duration(scanningInterval*1000))
+			time.Sleep(scanningInterval)
 		}
 	},
 }
@@ -77,7 +77,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("chartmuseumUrl", "c", "", "Chartmuseum URL")
 	rootCmd.PersistentFlags().StringP("chartmuseumUsername", "u", "", "Chartmuseum username")
 	rootCmd.PersistentFlags().StringP("chartmuseumPassword", "p", "", "Chartmuseum password")
-	rootCmd.PersistentFlags().IntP("scanningInterval", "s", 10, "Interval between scanning helm release secrets")
+	rootCmd.PersistentFlags().DurationP("scanningInterval", "s", 10*time.Second, "Interval between scanning helm release secrets")
 	viper.BindPFlag("chartmuseumUrl", rootCmd.PersistentFlags().Lookup("chartmuseumUrl"))
 	viper.BindPFlag("chartmuseumUsername", rootCmd.PersistentFlags().Lookup("chartmuseumUsername"))
 	viper.BindPFlag("chartmuseumPassword", rootCmd.PersistentFlags().Lookup("chartmuseumPassword"))
