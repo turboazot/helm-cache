@@ -1,5 +1,10 @@
 package entities
 
+import (
+	"encoding/base64"
+	"encoding/json"
+)
+
 type HelmRelease struct {
 	Name  string `json:"name" yaml:"name"`
 	Chart struct {
@@ -26,4 +31,34 @@ type HelmRelease struct {
 	} `json:"chart" yaml:"chart"`
 	IsSaved    bool
 	IsPackaged bool
+}
+
+func (r *HelmRelease) UnmarshalJSON(b []byte) error {
+	type HelmReleaseCopy HelmRelease
+	var result HelmReleaseCopy
+
+	err := json.Unmarshal(b, &result)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range result.Chart.Files {
+		d, err := base64.StdEncoding.DecodeString(f.Data)
+		if err != nil {
+			return err
+		}
+		f.Data = string(d)
+	}
+
+	for _, f := range result.Chart.Templates {
+		d, err := base64.StdEncoding.DecodeString(f.Data)
+		if err != nil {
+			return err
+		}
+		f.Data = string(d)
+	}
+
+	*r = HelmRelease(result)
+
+	return nil
 }

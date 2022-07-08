@@ -79,6 +79,9 @@ func (c *HelmClient) GetHelmRelease(s *entities.HelmReleaseSecret) (*entities.He
 	}
 
 	decodedBytes, err := ioutil.ReadAll(g)
+	if err != nil {
+		return nil, err
+	}
 
 	err = json.Unmarshal(decodedBytes, &r)
 	if err != nil {
