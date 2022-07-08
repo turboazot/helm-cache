@@ -12,68 +12,66 @@ import (
 	"go.uber.org/zap"
 )
 
-var cfgFile string
-var homeDirectory string
-var rootCmd = &cobra.Command{
-	Use:   "helm-cache",
-	Short: "Helm chart cache daemon",
-	Long:  "A cache daemon that caching Helm v3 charts in Kubernetes cluster",
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		return initConfig(cmd)
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		chartmuseumUrl, err := cmd.Flags().GetString("chartmuseumUrl")
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to get chartmuseum url: %v", err)
-		}
-		chartmuseumUsername, err := cmd.Flags().GetString("chartmuseumUsername")
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to get chartmuseum username: %v", err)
-		}
-		chartmuseumPassword, err := cmd.Flags().GetString("chartmuseumPassword")
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to get chartmuseum password: %v", err)
-		}
+func runRootCommand(cmd *cobra.Command, args []string) {
+	chartmuseumUrl, err := cmd.Flags().GetString("chartmuseumUrl")
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to get chartmuseum url: %v", err)
+	}
+	chartmuseumUsername, err := cmd.Flags().GetString("chartmuseumUsername")
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to get chartmuseum username: %v", err)
+	}
+	chartmuseumPassword, err := cmd.Flags().GetString("chartmuseumPassword")
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to get chartmuseum password: %v", err)
+	}
 
-		scanningInterval, err := cmd.Flags().GetDuration("scanningInterval")
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to get scanning interval: %v", err)
-		}
+	scanningInterval, err := cmd.Flags().GetDuration("scanningInterval")
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to get scanning interval: %v", err)
+	}
 
-		helmClient, err := services.NewHelmClient(homeDirectory)
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to initialize helm client: %v", err)
-		}
+	homeDirectory, err := cmd.Flags().GetString("homeDirectory")
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to get home directory value: %v", err)
+	}
 
-		chartmuseumClient, err := services.NewChartmuseumClient(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to initialize chartmuseum client: %v", err)
-		}
+	helmClient, err := services.NewHelmClient(homeDirectory)
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to initialize helm client: %v", err)
+	}
 
-		c, err := services.NewCollector(helmClient, chartmuseumClient)
-		if err != nil {
-			zap.L().Sugar().Fatalf("Fail to initialize collector: %v", err)
-		}
+	chartmuseumClient, err := services.NewChartmuseumClient(chartmuseumUrl, chartmuseumUsername, chartmuseumPassword)
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to initialize chartmuseum client: %v", err)
+	}
 
-		for {
-			zap.L().Sugar().Info("Checking all helm secrets...")
-			err = c.CheckAllSecrets()
-			if err != nil {
-				zap.L().Sugar().Fatalf("Fail to check helm secrets: %v", err)
-			}
-			zap.L().Sugar().Info("Checking finished!")
-			time.Sleep(scanningInterval)
+	c, err := services.NewCollector(helmClient, chartmuseumClient)
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to initialize collector: %v", err)
+	}
+
+	for {
+		zap.L().Sugar().Info("Checking all helm secrets...")
+		err = c.CheckAllSecrets()
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to check helm secrets: %v", err)
 		}
-	},
+		zap.L().Sugar().Info("Checking finished!")
+		time.Sleep(scanningInterval)
+	}
 }
 
 func Execute() error {
-	return rootCmd.Execute()
-}
-
-func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is path to config.yaml under helm-cache home directory)")
-	rootCmd.PersistentFlags().StringVar(&homeDirectory, "homedir", "", "Home directory (default is $HOME/.helm-cache)")
+	var rootCmd = &cobra.Command{
+		Use:               "helm-cache",
+		Short:             "Helm chart cache daemon",
+		Long:              "A cache daemon that caching Helm v3 charts in Kubernetes cluster",
+		PersistentPreRunE: initCommand,
+		Run:               runRootCommand,
+	}
+	rootCmd.PersistentFlags().StringP("configFile", "f", "", "config file (default is path to config.yaml under helm-cache home directory)")
+	rootCmd.PersistentFlags().StringP("homeDirectory", "d", "", "Home directory (default is $HOME/.helm-cache)")
 	rootCmd.PersistentFlags().StringP("chartmuseumUrl", "c", "", "Chartmuseum URL")
 	rootCmd.PersistentFlags().StringP("chartmuseumUsername", "u", "", "Chartmuseum username")
 	rootCmd.PersistentFlags().StringP("chartmuseumPassword", "p", "", "Chartmuseum password")
@@ -82,21 +80,37 @@ func init() {
 	viper.BindPFlag("chartmuseumUsername", rootCmd.PersistentFlags().Lookup("chartmuseumUsername"))
 	viper.BindPFlag("chartmuseumPassword", rootCmd.PersistentFlags().Lookup("chartmuseumPassword"))
 	viper.BindPFlag("scanningInterval", rootCmd.PersistentFlags().Lookup("scanningInterval"))
+
+	return rootCmd.Execute()
 }
 
-func initConfig(cmd *cobra.Command) error {
+func initCommand(cmd *cobra.Command, args []string) error {
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 	v := viper.New()
 
+	homeDirectory, err := cmd.Flags().GetString("homeDirectory")
+	if err != nil {
+		return err
+	}
+	configFile, err := cmd.Flags().GetString("configFile")
+	if err != nil {
+		return err
+	}
+
 	if homeDirectory == "" {
 		homeDirectory = fmt.Sprintf("%s/.helm-cache", userHomeDir)
 	}
 
-	if cfgFile != "" {
-		v.SetConfigFile(cfgFile)
+	err = cmd.Flags().Set("homeDirectory", homeDirectory)
+	if err != nil {
+		return err
+	}
+
+	if configFile != "" {
+		v.SetConfigFile(configFile)
 	} else {
 		v.AddConfigPath(homeDirectory)
 		v.SetConfigType("yaml")
@@ -109,16 +123,17 @@ func initConfig(cmd *cobra.Command) error {
 		zap.L().Sugar().Infof("Using config file: %s", v.ConfigFileUsed())
 	}
 
-	bindFlags(cmd, v)
-
-	return nil
+	return bindFlags(cmd, v)
 }
 
-func bindFlags(cmd *cobra.Command, v *viper.Viper) {
+func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
+	var err error = nil
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if !f.Changed && v.IsSet(f.Name) {
 			val := v.Get(f.Name)
-			cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
+			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
 		}
 	})
+
+	return err
 }
