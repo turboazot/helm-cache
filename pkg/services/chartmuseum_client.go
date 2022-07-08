@@ -147,7 +147,7 @@ func (c *ChartmuseumClient) Upload(chartName string, chartVersion string, f *os.
 		return err
 	}
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != http.StatusCreated {
 		return errors.New(fmt.Sprintf("Receiving list of charts failed. Status code - %d, Body - %s", resp.StatusCode, string(responseBody)))
 	}
 
