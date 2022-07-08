@@ -66,7 +66,7 @@ func (c *ChartmuseumClient) IsActive() bool {
 	return c.ChartmuseumUrl != ""
 }
 
-func (c *ChartmuseumClient) HasBasicAuth() bool {
+func (c *ChartmuseumClient) hasBasicAuth() bool {
 	return c.ChartmuseumUsername != "" && c.ChartmuseumPassword != ""
 }
 
@@ -76,7 +76,7 @@ func (c *ChartmuseumClient) GetAllCharts() ([]byte, error) {
 		return nil, err
 	}
 
-	if c.HasBasicAuth() {
+	if c.hasBasicAuth() {
 		req.SetBasicAuth(c.ChartmuseumUsername, c.ChartmuseumPassword)
 	}
 
@@ -132,7 +132,7 @@ func (c *ChartmuseumClient) Upload(chartName string, chartVersion string, f *os.
 		return err
 	}
 
-	if c.HasBasicAuth() {
+	if c.hasBasicAuth() {
 		req.SetBasicAuth(c.ChartmuseumUsername, c.ChartmuseumPassword)
 	}
 	req.Header.Add("Content-Type", writer.FormDataContentType())
