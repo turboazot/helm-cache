@@ -14,6 +14,7 @@ import (
 	"github.com/turboazot/helm-cache/pkg/entities"
 	"github.com/turboazot/helm-cache/pkg/utils"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/downloader"
 	"helm.sh/helm/v3/pkg/getter"
@@ -22,12 +23,13 @@ import (
 	"go.uber.org/zap"
 )
 
-func saveHelmReleaseFileCollection(directory string, files *[]entities.HelmReleaseFile) error {
+func saveHelmReleaseFileCollection(directory string, files *[]*chart.File) error {
 	for _, f := range *files {
-		err := f.Save(directory)
+		err := utils.WriteStringToFile(fmt.Sprintf("%s/%s", directory, f.Name), string(f.Data))
 		if err != nil {
 			return err
 		}
+
 	}
 
 	return nil
@@ -83,17 +85,17 @@ func (c *HelmClient) GetHelmRelease(s *entities.HelmReleaseSecret) (*entities.He
 		return nil, err
 	}
 
-	err = json.Unmarshal(decodedBytes, &r)
+	err = json.Unmarshal(decodedBytes, &r.Release)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = os.Stat(fmt.Sprintf("%s/%s-%s", c.RawChartsDirectory, r.Chart.Metadata.Name, r.Chart.Metadata.Version))
+	_, err = os.Stat(fmt.Sprintf("%s/%s-%s", c.RawChartsDirectory, r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version))
 	if err == nil {
 		r.IsSaved = true
 	}
 
-	_, err = os.Stat(fmt.Sprintf("%s/%s-%s.tgz", c.PackagedChartsDirectory, r.Chart.Metadata.Name, r.Chart.Metadata.Version))
+	_, err = os.Stat(fmt.Sprintf("%s/%s-%s.tgz", c.PackagedChartsDirectory, r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version))
 	if err == nil {
 		r.IsPackaged = true
 	}
@@ -127,42 +129,42 @@ func (c *HelmClient) GetLastRevisionReleaseSecretsMap(secrets *v1.SecretList) (m
 
 func (c *HelmClient) SaveRawChart(r *entities.HelmRelease) error {
 	if r.IsSaved {
-		zap.L().Sugar().Infof("Chart %s-%s already saved in local filesystem", r.Chart.Metadata.Name, r.Chart.Metadata.Version)
+		zap.L().Sugar().Infof("Chart %s-%s already saved in local filesystem", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version)
 		return nil
 	}
-	directory := fmt.Sprintf("%s/%s-%s", c.RawChartsDirectory, r.Chart.Metadata.Name, r.Chart.Metadata.Version)
+	directory := fmt.Sprintf("%s/%s-%s", c.RawChartsDirectory, r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version)
 
-	err := utils.WriteYamlToFile(&r.Chart.Values, fmt.Sprintf("%s/%s", directory, "values.yaml"))
+	err := utils.WriteYamlToFile(&r.Release.Chart.Values, fmt.Sprintf("%s/%s", directory, "values.yaml"))
 	if err != nil {
 		return err
 	}
-	err = utils.WriteYamlToFile(&r.Chart.Metadata, fmt.Sprintf("%s/%s", directory, "Chart.yaml"))
+	err = utils.WriteYamlToFile(&r.Release.Chart.Metadata, fmt.Sprintf("%s/%s", directory, "Chart.yaml"))
 	if err != nil {
 		return err
 	}
-	err = saveHelmReleaseFileCollection(fmt.Sprintf("%s/templates", directory), &r.Chart.Templates)
+	err = saveHelmReleaseFileCollection(directory, &r.Release.Chart.Templates)
 	if err != nil {
 		return err
 	}
 
-	err = saveHelmReleaseFileCollection(directory, &r.Chart.Files)
+	err = saveHelmReleaseFileCollection(directory, &r.Release.Chart.Files)
 	if err != nil {
 		return err
 	}
 
 	r.IsSaved = true
 
-	zap.L().Sugar().Infof("Successfully saved raw chart: %s-%s", r.Chart.Metadata.Name, r.Chart.Metadata.Version)
+	zap.L().Sugar().Infof("Successfully saved raw chart: %s-%s", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version)
 
 	return nil
 }
 
 func (c *HelmClient) GetReleasePackageFile(r *entities.HelmRelease) (*os.File, error) {
 	if !r.IsPackaged {
-		return nil, errors.New(fmt.Sprintf("Release %s hasn't been saved yet", r.Name))
+		return nil, errors.New(fmt.Sprintf("Release %s hasn't been saved yet", r.Release.Name))
 	}
 
-	return os.Open(fmt.Sprintf("%s/%s-%s.tgz", c.PackagedChartsDirectory, r.Chart.Metadata.Name, r.Chart.Metadata.Version))
+	return os.Open(fmt.Sprintf("%s/%s-%s.tgz", c.PackagedChartsDirectory, r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version))
 }
 
 func (c *HelmClient) Package(chartName string, chartVersion string) error {

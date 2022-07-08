@@ -59,21 +59,21 @@ func (c *Collector) CheckAllSecrets() error {
 			continue
 		}
 
-		if c.ChartmuseumClient.IsActive() && c.ChartmuseumClient.IsExists(r.Chart.Metadata.Name, r.Chart.Metadata.Version) {
-			zap.L().Sugar().Infof("Chart %s-%s already exists in the chartmuseum", r.Chart.Metadata.Name, r.Chart.Metadata.Version)
+		if c.ChartmuseumClient.IsActive() && c.ChartmuseumClient.IsExists(r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version) {
+			zap.L().Sugar().Infof("Chart %s-%s already exists in the chartmuseum", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version)
 			continue
 		}
 
 		if err := c.HelmClient.SaveRawChart(r); err != nil {
-			zap.L().Sugar().Infof("Can't save %s-%s chart in local filesystem: %v", r.Chart.Metadata.Name, r.Chart.Metadata.Version, err)
+			zap.L().Sugar().Infof("Can't save %s-%s chart in local filesystem: %v", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version, err)
 			continue
 		}
 
 		if r.IsPackaged {
-			zap.L().Sugar().Infof("Chart %s-%s is already packaged in local filesystem", r.Chart.Metadata.Name, r.Chart.Metadata.Version)
+			zap.L().Sugar().Infof("Chart %s-%s is already packaged in local filesystem", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version)
 		} else {
-			if err := c.HelmClient.Package(r.Chart.Metadata.Name, r.Chart.Metadata.Version); err != nil {
-				zap.L().Sugar().Infof("Can't package %s-%s chart in local filesystem: %v", r.Chart.Metadata.Name, r.Chart.Metadata.Version, err)
+			if err := c.HelmClient.Package(r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version); err != nil {
+				zap.L().Sugar().Infof("Can't package %s-%s chart in local filesystem: %v", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version, err)
 				continue
 			}
 			r.IsPackaged = true
@@ -82,13 +82,13 @@ func (c *Collector) CheckAllSecrets() error {
 		if c.ChartmuseumClient.IsActive() {
 			packageFile, err := c.HelmClient.GetReleasePackageFile(r)
 			if err != nil {
-				zap.L().Sugar().Infof("Can't get package file for %s-%s chart in local filesystem: %v", r.Chart.Metadata.Name, r.Chart.Metadata.Version, err)
+				zap.L().Sugar().Infof("Can't get package file for %s-%s chart in local filesystem: %v", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version, err)
 				continue
 			}
 
-			err = c.ChartmuseumClient.Upload(r.Chart.Metadata.Name, r.Chart.Metadata.Version, packageFile)
+			err = c.ChartmuseumClient.Upload(r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version, packageFile)
 			if err != nil {
-				zap.L().Sugar().Infof("Can't upload %s-%s chart: %v", r.Chart.Metadata.Name, r.Chart.Metadata.Version, err)
+				zap.L().Sugar().Infof("Can't upload %s-%s chart: %v", r.Release.Chart.Metadata.Name, r.Release.Chart.Metadata.Version, err)
 				continue
 			}
 		}
