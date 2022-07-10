@@ -12,5 +12,8 @@ func main() {
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
-	cmd.Execute()
+	err := cmd.Execute()
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to initialize root command: %v", err)
+	}
 }
