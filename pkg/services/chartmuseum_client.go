@@ -21,7 +21,7 @@ type ChartmuseumClient struct {
 	ChartmuseumUsername string
 	ChartmuseumPassword string
 	HttpClient          *http.Client
-	ChartVersionCache   map[string]map[string]bool
+	ChartVersionCache   map[string]bool
 }
 
 func NewChartmuseumClient(chartmuseumUrl string, chartmuseumUsername string, chartmuseumPassword string) (*ChartmuseumClient, error) {
@@ -30,7 +30,7 @@ func NewChartmuseumClient(chartmuseumUrl string, chartmuseumUsername string, cha
 		ChartmuseumUsername: chartmuseumUsername,
 		ChartmuseumPassword: chartmuseumPassword,
 		HttpClient:          &http.Client{},
-		ChartVersionCache:   make(map[string]map[string]bool),
+		ChartVersionCache:   make(map[string]bool),
 	}
 
 	if !c.IsActive() {

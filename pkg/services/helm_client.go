@@ -64,13 +64,13 @@ func (c *HelmClient) GetHelmRelease(s *entities.HelmReleaseSecret) (*entities.He
 	var r entities.HelmRelease
 	r.IsSaved = false
 
-	if _, releaseKeyExists := s.Secret.Data["release"]; !releaseKeyExists {
+	if _, releaseKeyExists := s.Data["release"]; !releaseKeyExists {
 		return nil, errors.New(fmt.Sprintf("Release secret %s doesn't contain release key in data", s.Secret.Name))
 	}
 
 	var base64DecodedBytes []byte
 
-	base64DecodedBytes, err := base64.StdEncoding.DecodeString(string(s.Secret.Data["release"]))
+	base64DecodedBytes, err := base64.StdEncoding.DecodeString(string(s.Data["release"]))
 	if err != nil {
 		return nil, err
 	}

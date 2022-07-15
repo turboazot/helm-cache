@@ -9,13 +9,15 @@ import (
 )
 
 type HelmReleaseSecret struct {
-	Secret *v1.Secret
+	v1.Secret
 }
 
 func NewHelmReleaseSecret(secret *v1.Secret) *HelmReleaseSecret {
-	return &HelmReleaseSecret{
-		Secret: secret,
-	}
+	var s = &HelmReleaseSecret{}
+	s.Name = secret.Name
+	s.Namespace = secret.Namespace
+	s.Data = secret.Data
+	return s
 }
 
 func (s *HelmReleaseSecret) GetReleaseNameAndRevision() (string, int, error) {
