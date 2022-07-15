@@ -52,10 +52,7 @@ func NewChartmuseumClient(chartmuseumUrl string, chartmuseumUsername string, cha
 	for chartName, chartsArray := range chartsMap {
 		for _, chart := range chartsArray {
 			chartInstanceVersion := chart.Version
-			if _, chartInstanceExists := c.ChartVersionCache[chartName]; !chartInstanceExists {
-				c.ChartVersionCache[chartName] = make(map[string]bool)
-			}
-			c.ChartVersionCache[chartName][chartInstanceVersion] = true
+			c.ChartVersionCache[fmt.Sprintf("%s-%s", chartName, chartInstanceVersion)] = true
 		}
 	}
 
@@ -151,11 +148,7 @@ func (c *ChartmuseumClient) Upload(chartName string, chartVersion string, f *os.
 		return errors.New(fmt.Sprintf("Receiving list of charts failed. Status code - %d, Body - %s", resp.StatusCode, string(responseBody)))
 	}
 
-	if _, chartExists := c.ChartVersionCache[chartName]; !chartExists {
-		c.ChartVersionCache[chartName] = make(map[string]bool)
-	}
-
-	c.ChartVersionCache[chartName][chartVersion] = true
+	c.ChartVersionCache[fmt.Sprintf("%s-%s", chartName, chartVersion)] = true
 
 	zap.L().Sugar().Infof("Successfully uploaded chart: %s-%s", chartName, chartVersion)
 
@@ -163,8 +156,5 @@ func (c *ChartmuseumClient) Upload(chartName string, chartVersion string, f *os.
 }
 
 func (c *ChartmuseumClient) IsExists(chartName string, chartVersion string) bool {
-	if _, chartExists := c.ChartVersionCache[chartName]; !chartExists {
-		return false
-	}
-	return c.ChartVersionCache[chartName][chartVersion]
+	return c.ChartVersionCache[fmt.Sprintf("%s-%s", chartName, chartVersion)]
 }
