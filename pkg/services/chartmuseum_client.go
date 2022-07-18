@@ -10,7 +10,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/turboazot/helm-cache/pkg/entities"
 
 	"go.uber.org/zap"
@@ -20,16 +22,20 @@ type ChartmuseumClient struct {
 	ChartmuseumUrl      string
 	ChartmuseumUsername string
 	ChartmuseumPassword string
-	HttpClient          *http.Client
+	HttpClient          *retryablehttp.Client
 	ChartVersionCache   map[string]bool
 }
 
 func NewChartmuseumClient(chartmuseumUrl string, chartmuseumUsername string, chartmuseumPassword string) (*ChartmuseumClient, error) {
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 5
+	retryClient.HTTPClient.Timeout = 5 * time.Second
+
 	var c *ChartmuseumClient = &ChartmuseumClient{
 		ChartmuseumUrl:      chartmuseumUrl,
 		ChartmuseumUsername: chartmuseumUsername,
 		ChartmuseumPassword: chartmuseumPassword,
-		HttpClient:          &http.Client{},
+		HttpClient:          retryClient,
 		ChartVersionCache:   make(map[string]bool),
 	}
 
@@ -68,7 +74,7 @@ func (c *ChartmuseumClient) hasBasicAuth() bool {
 }
 
 func (c *ChartmuseumClient) GetAllCharts() ([]byte, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/charts", c.ChartmuseumUrl), nil)
+	req, err := retryablehttp.NewRequest("GET", fmt.Sprintf("%s/api/charts", c.ChartmuseumUrl), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +130,7 @@ func (c *ChartmuseumClient) Upload(chartName string, chartVersion string, f *os.
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/charts", c.ChartmuseumUrl), body)
+	req, err := retryablehttp.NewRequest("POST", fmt.Sprintf("%s/api/charts", c.ChartmuseumUrl), body)
 	if err != nil {
 		return err
 	}

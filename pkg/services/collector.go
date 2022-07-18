@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 type Collector struct {
@@ -16,13 +16,8 @@ type Collector struct {
 }
 
 func NewCollector(helmClient *HelmClient, chartmuseumClient *ChartmuseumClient) (*Collector, error) {
-	// // In-cluster config
-	// config, err := rest.InClusterConfig()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	config, err := clientcmd.BuildConfigFromFlags("", "/Users/turboazot/.kube/config.ln")
+	// In-cluster config
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
 	}
