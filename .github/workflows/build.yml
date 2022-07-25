@@ -57,8 +57,6 @@ jobs:
         with:
           repository: 'turboazot/helm-repo'
           path: 'helm-repo'
-          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          persist-credentials: true
       - name: Helm lint
         run: helm lint helm-cache/charts/helm-cache
       - name: Helm package
@@ -76,6 +74,7 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           branch: master
+          repository: 'turboazot/helm-repo'
           directory: helm-repo
 
       
