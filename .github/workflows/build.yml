@@ -57,6 +57,8 @@ jobs:
         with:
           repository: 'turboazot/helm-repo'
           path: 'helm-repo'
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          persist-credentials: true
       - name: Helm lint
         run: helm lint helm-cache/charts/helm-cache
       - name: Helm package
@@ -70,7 +72,11 @@ jobs:
           git config user.email "<>"
           git add .
           git commit -m "Add helm-cache ${{ steps.get_version.outputs.VERSION }} helm chart"
-          git push origin master
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          branch: master
+          directory: helm-repo
 
       
       
