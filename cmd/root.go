@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -13,6 +14,9 @@ import (
 )
 
 func runRootCommand(cmd *cobra.Command, args []string) {
+	var err error
+	var kubeconfigPath string
+
 	chartmuseumUrl, err := cmd.Flags().GetString("chartmuseumUrl")
 	if err != nil {
 		zap.L().Sugar().Fatalf("Fail to get chartmuseum url: %v", err)
@@ -36,6 +40,19 @@ func runRootCommand(cmd *cobra.Command, args []string) {
 		zap.L().Sugar().Fatalf("Fail to get home directory value: %v", err)
 	}
 
+	inclusterConfig, err := cmd.Flags().GetBool("inclusterConfig")
+	if err != nil {
+		zap.L().Sugar().Fatalf("Fail to get in-cluster config value: %v", err)
+	}
+	if inclusterConfig {
+		kubeconfigPath = ""
+	} else {
+		kubeconfigPath, err = cmd.Flags().GetString("kubeconfigPath")
+		if err != nil {
+			zap.L().Sugar().Fatalf("Fail to get kubeconfig path config value: %v", err)
+		}
+	}
+
 	helmClient, err := services.NewHelmClient(homeDirectory)
 	if err != nil {
 		zap.L().Sugar().Fatalf("Fail to initialize helm client: %v", err)
@@ -46,7 +63,7 @@ func runRootCommand(cmd *cobra.Command, args []string) {
 		zap.L().Sugar().Fatalf("Fail to initialize chartmuseum client: %v", err)
 	}
 
-	c, err := services.NewCollector(helmClient, chartmuseumClient)
+	c, err := services.NewCollector(helmClient, chartmuseumClient, kubeconfigPath)
 	if err != nil {
 		zap.L().Sugar().Fatalf("Fail to initialize collector: %v", err)
 	}
@@ -71,6 +88,8 @@ func Execute() error {
 		Run:               runRootCommand,
 	}
 	rootCmd.PersistentFlags().StringP("configFile", "f", "", "config file (default is path to config.yaml under helm-cache home directory)")
+	rootCmd.PersistentFlags().BoolP("inclusterConfig", "i", false, "in-cluster config")
+	rootCmd.PersistentFlags().StringP("kubeconfigPath", "k", "", "kubeconfig path (default is $HOME/.kube/config)")
 	rootCmd.PersistentFlags().StringP("homeDirectory", "d", "", "Home directory (default is $HOME/.helm-cache)")
 	rootCmd.PersistentFlags().StringP("chartmuseumUrl", "c", "", "Chartmuseum URL")
 	rootCmd.PersistentFlags().StringP("chartmuseumUsername", "u", "", "Chartmuseum username")
@@ -98,6 +117,26 @@ func initCommand(cmd *cobra.Command, args []string) error {
 	configFile, err := cmd.Flags().GetString("configFile")
 	if err != nil {
 		return err
+	}
+
+	kubeconfigPath, err := cmd.Flags().GetString("kubeconfigPath")
+	if err != nil {
+		return err
+	}
+
+	inclusterConfig, err := cmd.Flags().GetBool("inclusterConfig")
+	if err != nil {
+		return err
+	}
+
+	if kubeconfigPath == "" {
+		defaultKubeconfigPath := fmt.Sprintf("%s/.kube/config", userHomeDir)
+
+		_, err := os.Stat(defaultKubeconfigPath)
+
+		if !errors.Is(err, os.ErrNotExist) && !inclusterConfig {
+			cmd.Flags().Set("kubeconfigPath", defaultKubeconfigPath)
+		}
 	}
 
 	if homeDirectory == "" {

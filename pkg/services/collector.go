@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Collector struct {
@@ -15,11 +16,22 @@ type Collector struct {
 	KubernetesClientset *kubernetes.Clientset
 }
 
-func NewCollector(helmClient *HelmClient, chartmuseumClient *ChartmuseumClient) (*Collector, error) {
-	// In-cluster config
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
+func NewCollector(helmClient *HelmClient, chartmuseumClient *ChartmuseumClient, kubeconfigPath string) (*Collector, error) {
+	var config *rest.Config
+	var err error
+
+	if kubeconfigPath == "" {
+		zap.L().Sugar().Info("Using in-cluster kubeconfig")
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		zap.L().Sugar().Infof("Using %s kubeconfig", kubeconfigPath)
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
