@@ -23,3 +23,47 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: darwin
         goarch: amd64
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: turboazot/helm-cache:$GITHUB_REF_NAME
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helm-cache
+        uses: actions/checkout@v3
+        with:
+          path: 'helm-cache'
+      - name: Checkout helm-repo
+        uses: actions/checkout@v3
+        with:
+          repository: 'turboazot/helm-repo'
+          path: 'helm-repo'
+      - name: Helm lint
+        run: helm lint helm-cache/charts/helm-cache
+      - name: Helm package
+        run: helm package helm-cache/charts/helm-cache --version $GITHUB_REF_NAME --app-version $GITHUB_REF_NAME
+      - name: Reindex helm repo
+        run: |
+          mv helm-cache-$GITHUB_REF_NAME.tgz ./helm-repo/helm-cache-$GITHUB_REF_NAME.tgz
+          cd helm-repo
+          helm repo index --url https://turboazot.github.io/helm-repo/ .
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          git add .
+          git commit -m "Add helm-cache $GITHUB_REF_NAME helm chart"
+          git push origin master
+
+      
+      
+  
