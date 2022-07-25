@@ -27,6 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: default
     steps:
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - uses: actions/checkout@v3
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -37,11 +40,14 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: turboazot/helm-cache:${{ env.GITHUB_REF_NAME }}
+          tags: turboazot/helm-cache:${{ steps.get_version.outputs.VERSION }}
   helm:
     runs-on: ubuntu-latest
     environment: default
     steps:
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
       - name: Checkout helm-cache
         uses: actions/checkout@v3
         with:
@@ -54,16 +60,16 @@ jobs:
       - name: Helm lint
         run: helm lint helm-cache/charts/helm-cache
       - name: Helm package
-        run: helm package helm-cache/charts/helm-cache --version $GITHUB_REF_NAME --app-version $GITHUB_REF_NAME
+        run: helm package helm-cache/charts/helm-cache --version ${{ steps.get_version.outputs.VERSION }} --app-version ${{ steps.get_version.outputs.VERSION }}
       - name: Reindex helm repo
         run: |
-          mv helm-cache-$GITHUB_REF_NAME.tgz ./helm-repo/helm-cache-$GITHUB_REF_NAME.tgz
+          mv helm-cache-${{ steps.get_version.outputs.VERSION }}.tgz ./helm-repo/helm-cache-${{ steps.get_version.outputs.VERSION }}.tgz
           cd helm-repo
           helm repo index --url https://turboazot.github.io/helm-repo/ .
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git add .
-          git commit -m "Add helm-cache $GITHUB_REF_NAME helm chart"
+          git commit -m "Add helm-cache ${{ steps.get_version.outputs.VERSION }} helm chart"
           git push origin master
 
       
