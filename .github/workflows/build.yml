@@ -25,6 +25,7 @@ jobs:
         goarch: amd64
   docker:
     runs-on: ubuntu-latest
+    environment: default
     steps:
       - uses: actions/checkout@v3
       - name: Login to DockerHub
@@ -39,6 +40,7 @@ jobs:
           tags: turboazot/helm-cache:$GITHUB_REF_NAME
   helm:
     runs-on: ubuntu-latest
+    environment: default
     steps:
       - name: Checkout helm-cache
         uses: actions/checkout@v3
