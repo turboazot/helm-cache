@@ -70,7 +70,7 @@ $ helm upgrade --install --create-namespace \
 | fullnameOverride | string | `""` | String to fully override helm-cache.fullname template. |
 | image.pullPolicy | string | `"IfNotPresent"` | helm-cache image pull policy. |
 | image.repository | string | `"turboazot/helm-cache"` | helm-cache image repository. |
-| image.tag | string | `"0.0.8"` | helm-cache image tag. |
+| image.tag | string | `""` | helm-cache image tag (by default the same as helm chart version). |
 | imagePullSecrets | list | `[]` | helm-cache image pull secrets. |
 | nameOverride | string | `""` | String to partially override helm-cache.fullname template (will maintain the release name). |
 | nodeSelector | object | `{}` | Node labels for pod assignment. Evaluated as a template. |
