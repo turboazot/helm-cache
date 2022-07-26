@@ -66,8 +66,8 @@ jobs:
           mv helm-cache-${{ steps.get_version.outputs.VERSION }}.tgz ./helm-repo/helm-cache-${{ steps.get_version.outputs.VERSION }}.tgz
           cd helm-repo
           helm repo index --url https://turboazot.github.io/helm-repo/ .
-          git config user.name "GitHub Actions Bot"
-          git config user.email "<>"
+          git config user.name "turboazot"
+          git config user.email "zntu1995@gmail.com"
           git add .
           git commit -m "Add helm-cache ${{ steps.get_version.outputs.VERSION }} helm chart"
       - name: Push changes
