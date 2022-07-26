@@ -76,6 +76,7 @@ jobs:
           branch: master
           repository: 'turboazot/helm-repo'
           directory: helm-repo
+          github_token: ${{ secrets.ACCESS_TOKEN }}
 
       
       
