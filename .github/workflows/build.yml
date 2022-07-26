@@ -23,24 +23,24 @@ jobs:
   #       github_token: ${{ secrets.GITHUB_TOKEN }}
   #       goos: darwin
   #       goarch: amd64
-  docker:
-    runs-on: ubuntu-latest
-    environment: default
-    steps:
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
-      - uses: actions/checkout@v3
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          push: true
-          tags: turboazot/helm-cache:${{ steps.get_version.outputs.VERSION }}
+  # docker:
+  #   runs-on: ubuntu-latest
+  #   environment: default
+  #   steps:
+  #     - name: Get the version
+  #       id: get_version
+  #       run: echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3)
+  #     - uses: actions/checkout@v3
+  #     - name: Login to DockerHub
+  #       uses: docker/login-action@v2
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #     - name: Build and push
+  #       uses: docker/build-push-action@v3
+  #       with:
+  #         push: true
+  #         tags: turboazot/helm-cache:${{ steps.get_version.outputs.VERSION }}
   helm:
     runs-on: ubuntu-latest
     environment: default
@@ -76,7 +76,7 @@ jobs:
           branch: master
           repository: 'turboazot/helm-repo'
           directory: helm-repo
-          github_token: ${{ secrets.ACCESS_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       
       
