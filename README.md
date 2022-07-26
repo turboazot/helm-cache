@@ -1,38 +1,65 @@
 # Helm Cache
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.16.0](https://img.shields.io/badge/AppVersion-1.16.0-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
 
 A service for caching charts from secrets in Kubernetes, save them localy and store on [Chartmuseum](https://github.com/helm/chartmuseum) (optionally).
 
-## Prerequisites
+## Quick start
+
+Binary downloads of the helm-cache can be found on the [Releases](https://github.com/turboazot/helm-cache/releases) page.
+
+By default helm-cache creates working directory in `~/.helm-cache`. Default config path is `~/.helm-cache/config.yaml`. There are some examples how you can start helm-cache:
+```bash
+# Running with defaults (default kubeconfig path is ~/.kube/config)
+$ helm-cache
+
+# Specify kubeconfig path
+$ helm-cache -k ~/.kube/customkubeconfig
+
+# Specify custom working directory path
+$ helm-cache -d /opt/helm-cache
+
+# Specify custom config path
+$ helm-cache -f /opt/helm-cache/myconfig.yaml
+```
+
+## Docker image
+
+You can also helm-cache using docker image. For example:
+```bash
+docker run -d --name helm-cache \
+    -v ~/.kube/config:/root/.kube/config \
+    -v $(pwd)/data:/root/.helm-cache turboazot/helm-cache:0.1.0
+```
+
+## Helm chart
+### Prerequisites
 
 - Helm >= 3
 - Kubernetes >= 1.16
 
-## Installing the chart
-
-Without Chartmuseum cache:
+### Installation
 
 ```shell
+$ helm repo add turboazot https://turboazot.github.io/helm-repo
+
+# Without Chartmuseum cache:
 $ helm upgrade --install --create-namespace \
     -n helm-cache \
     helm-cache \
-    ./charts/helm-cache
-```
+    turboazot/helm-cache
 
-With Chartmuseum cache:
-
-```shell
+# With Chartmuseum cache:
 $ helm upgrade --install --create-namespace \
     -n helm-cache \
     helm-cache \
     --set chartmuseum.url=http://chartmuseum-url:8080 \
     --set chartmuseum.username=chartmuseum \
     --set chartmuseum.password=chartmuseum \
-    ./charts/helm-cache
+    turboazot/helm-cache
 ```
 
-## Values
+### Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
