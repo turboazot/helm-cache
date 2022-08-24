@@ -4,6 +4,10 @@
 
 A service for caching charts from secrets in Kubernetes, save them localy and store on [Chartmuseum](https://github.com/helm/chartmuseum) (optionally).
 
+## Use-case
+
+Helm-cache allows you to be less dependent on third-party repos. For example, after [this incident](https://github.com/bitnami/charts/issues/10539), many customers were unable to deploy/upgrade their old charts. This can be solved by Helm-cache with caching your deployed helm charts on a disk or [Chartmuseum](https://github.com/helm/chartmuseum).
+
 ## Quick start
 
 Binary downloads of the helm-cache can be found on the [Releases](https://github.com/turboazot/helm-cache/releases) page.
